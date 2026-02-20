@@ -39,6 +39,7 @@ setup(
             "motion_statechart_inspector = scripts.tools.motion_statechart_inspector:main",
             "tracy_standalone = scripts.tracy_standalone:main",
             "tracy_velocity = scripts.tracy_velocity:main",
+            "ur10_velocity = giskardpy_ros.configs.other_robots.ur10:main",
         ],
     },
 )
