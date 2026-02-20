@@ -7,9 +7,10 @@ import xacro
 from giskardpy.middleware import get_middleware
 
 
-def load_xacro(path: str) -> str:
+def load_xacro(path: str, **extra_mappings: str) -> str:
     path = get_middleware().resolve_iri(path)
-    doc = xacro.process_file(path, mappings={"radius": "0.9"})
+    mappings = {"radius": "0.9", **extra_mappings}
+    doc = xacro.process_file(path, mappings=mappings)
     return doc.toprettyxml(indent="  ")
 
 
