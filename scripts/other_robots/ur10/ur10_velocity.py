@@ -1,16 +1,19 @@
 """
-Start the Giskard motion planner for a UR10 robot.
+Backward-compatible wrapper for the UR10 Giskard entry point.
 
-Reads ``robot_description`` from a ROS parameter. Falls back to the
-default POC-thyssen xacro when the parameter is not set.
+The canonical implementation now lives in
+``giskardpy_ros.configs.other_robots.ur10`` (config classes) and
+``scripts.other_robots.ur10.ur10_velocity`` (entry point).
 
-The ``mode`` parameter controls hardware vs. simulation:
-
-- ``"hardware"``: :class:`ClosedLoopBTConfig` + :class:`UR10VelocityInterface`
-- ``"standalone"`` (default): :class:`StandAloneBTConfig` +
-  :class:`UR10StandAloneRobotInterfaceConfig`
+This script re-exports the config classes so that existing imports
+continue to work, and delegates ``python ur10_velocity.py <xacro>``
+to the original argparse-based workflow for users who invoke the
+script directly.
 """
 from __future__ import annotations
+
+import argparse
+import os
 
 from giskardpy.model.collision_world_syncer import CollisionCheckerLib
 from giskardpy.qp.qp_controller_config import QPControllerConfig
@@ -27,38 +30,31 @@ from giskardpy_ros.configs.other_robots.ur10 import (
 from giskardpy_ros.ros2 import rospy
 from giskardpy_ros.ros2.visualization_mode import VisualizationMode
 from giskardpy_ros.utils.utils import load_xacro
-from rclpy import Parameter
-from rclpy.exceptions import ParameterUninitializedException
+
+__all__ = [
+    "WorldWithUR10Config",
+    "UR10VelocityInterface",
+    "UR10StandAloneRobotInterfaceConfig",
+]
 
 
-def main() -> None:
+def main(args: argparse.Namespace) -> None:
     """
-    Entry point for the UR10 Giskard node.
+    Start the Giskard motion planner using an explicit xacro path.
 
-    Declares ROS parameters ``robot_description`` and ``mode``, builds the
-    appropriate configuration, and starts the Giskard behaviour-tree loop.
+    This preserves the original CLI interface for direct invocation::
+
+        python ur10_velocity.py models/ur10_femto_bolt.urdf.xacro
+        python ur10_velocity.py models/ur10_femto_bolt.urdf.xacro --standalone
+
+    :param args: Parsed arguments containing ``robot_description``
+        and ``standalone``.
     """
     rospy.init_node("giskard")
-    rospy.node.declare_parameters(
-        namespace="",
-        parameters=[
-            ("robot_description", Parameter.Type.STRING),
-            ("mode", Parameter.Type.STRING),
-        ],
-    )
+    xacro_path = os.path.abspath(args.robot_description)
+    robot_description = load_xacro(xacro_path)
 
-    try:
-        robot_description = rospy.node.get_parameter("robot_description").value
-    except ParameterUninitializedException:
-        robot_description = load_xacro(
-            "package://poc_thyssen/models/ur10_femto_bolt.urdf.xacro"
-        )
-
-    mode = rospy.node.get_parameter_or(
-        "mode", Parameter("mode", value="standalone")
-    ).value
-
-    if mode == "standalone":
+    if args.standalone:
         behavior_tree_config = StandAloneBTConfig(
             visualization_mode=VisualizationMode.VisualsFrameLocked
         )
@@ -75,11 +71,24 @@ def main() -> None:
         robot_interface_config=robot_interface_config,
         behavior_tree_config=behavior_tree_config,
         qp_controller_config=QPControllerConfig(
-            target_frequency=80, prediction_horizon=30
+            target_frequency=80, prediction_horizon=35
         ),
     )
     giskard.live()
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(
+        description="Start the Giskard motion planner for a UR10 robot."
+    )
+    parser.add_argument(
+        "robot_description",
+        help="Path to the robot description xacro file.",
+    )
+    parser.add_argument(
+        "--standalone",
+        action="store_true",
+        help="Run in standalone mode (simulated robot, publishes TF).",
+    )
+    arguments = parser.parse_args()
+    main(arguments)
