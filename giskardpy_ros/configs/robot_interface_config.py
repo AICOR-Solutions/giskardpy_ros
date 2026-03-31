@@ -11,7 +11,7 @@ from sensor_msgs.msg import JointState
 from std_msgs.msg import Float64MultiArray
 
 from giskardpy.data_types.exceptions import SetupException
-from giskardpy_ros.ros2 import rospy
+from giskardpy.middleware.ros2 import rospy
 from giskardpy_ros.ros2.ros2_interface import (
     search_for_subscriber_of_node_with_type,
     get_parameters,
@@ -28,7 +28,7 @@ from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     OmniDrive,
     ActiveConnection,
-    Connection6DoF,
+    Connection6DoF, DifferentialDrive,
 )
 from semantic_digital_twin.world_description.world_entity import Connection
 
@@ -42,7 +42,7 @@ class RobotInterfaceConfig(ABC):
 
     @property
     def world(self) -> World:
-        return GiskardBlackboard().executor.world
+        return GiskardBlackboard().executor.context.world
 
     @property
     def robot(self) -> AbstractRobot:
@@ -53,17 +53,17 @@ class RobotInterfaceConfig(ABC):
         return GiskardBlackboard().tree
 
     def sync_odometry_topic(
-        self,
-        odometry_topic: Optional[str] = None,
-        joint: OmniDrive = None,
-        sync_in_control_loop: bool = True,
+            self,
+            odometry_topic: Optional[str] = None,
+            joint: Union[OmniDrive, DifferentialDrive] = None,
+            sync_in_control_loop: bool = True,
     ):
         """
         Tell Giskard to sync an odometry joint added during by the world config.
         """
         if odometry_topic is None:
             odometry_topic = search_for_unique_publisher_of_type(Odometry)
-        assert isinstance(joint, OmniDrive)
+        assert isinstance(joint, (OmniDrive, DifferentialDrive))
         self.tree.wait_for_goal.synchronization.sync_odometry_topic(
             odometry_topic, joint
         )
@@ -251,7 +251,7 @@ class RobotInterfaceConfig(ABC):
         controlled_connections: List[Connection] = []
         for i in range(len(connections)):
             controlled_connections.append(
-                GiskardBlackboard().executor.world.get_connection_by_name(
+                GiskardBlackboard().executor.context.world.get_connection_by_name(
                     connections[i]
                 )
             )

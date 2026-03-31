@@ -4,13 +4,12 @@ import os
 
 import xacro
 
-from giskardpy.middleware import get_middleware
+from semantic_digital_twin.adapters.package_resolver import CompositePathResolver
 
 
-def load_xacro(path: str, **extra_mappings: str) -> str:
-    path = get_middleware().resolve_iri(path)
-    mappings = {"radius": "0.9", **extra_mappings}
-    doc = xacro.process_file(path, mappings=mappings)
+def load_xacro(path: str) -> str:
+    path = CompositePathResolver().resolve(path)
+    doc = xacro.process_file(path, mappings={"radius": "0.9"})
     return doc.toprettyxml(indent="  ")
 
 
